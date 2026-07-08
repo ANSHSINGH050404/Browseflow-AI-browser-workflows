@@ -21,6 +21,7 @@ export default async function Page({
   // Rooms are private by default under ID-token auth. Grant write access to the
   // owning org, matching the `groupIds: [orgId]` issued by the auth endpoint.
   await liveblocks.getOrCreateRoom(id, {
+    organizationId: orgId,
     defaultAccesses: [],
     groupsAccesses: {
       [orgId]: ["room:write"],
