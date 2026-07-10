@@ -25,8 +25,12 @@ Right after marking a node "running", force the metadata to flush — otherwise 
 state gets overwritten by "done" before it's ever pushed and we'd never see the
 spinner.
 
-Also return the final steps from the task so the finished state is guaranteed. Keep
-the existing interpolation and execution as-is.
+Also flush right after marking a node "failed", before the run stops — a thrown run
+returns no output, so the flushed metadata is the only way that failed state ever
+reaches the canvas.
+
+Also return the final steps from the task so a successful run's finished state is
+guaranteed. Keep the existing interpolation and execution as-is.
 
 Use the Trigger.dev tasks skill.
 ```
