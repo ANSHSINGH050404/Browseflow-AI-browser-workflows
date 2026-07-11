@@ -22,9 +22,13 @@ error if it failed, plus how long it took.
 Right now a run step only records its node id and status in
 @features/workflows/tasks/run-workflow.ts, so there's nothing to show yet.
 
-Capture what the panel will need as the run walks its steps, then expose that run
-data from @features/workflows/components/workflow-runs-provider.tsx so a panel can
-read every run and its steps.
+Make each step track everything the console will show: which node it is (for its
+icon and title), its status as it moves from pending to running to done or failed,
+how long it took, whatever it output, and its error if it threw.
+
+Then expose that run data from
+@features/workflows/components/workflow-runs-provider.tsx so a panel can read every
+run and its steps.
 
 Don't build the UI yet — just get the data in place.
 ```
@@ -38,8 +42,9 @@ Build a console panel below the canvas that lists workflow runs: every run and,
 below it, its steps.
 
 Each step shows its node's icon, its title, and how long it took (format the
-duration with pretty-ms), and spins while it's running; steps that never actually
-ran should look inactive. Clicking a step selects it, clicking again deselects.
+duration with pretty-ms). A step spins while it's running, turns red if it failed,
+and looks inactive if it never ran. Clicking a step selects it, clicking again
+deselects.
 
 The accent-colored node icon already exists as NodeIcon in
 @features/workflows/components/right-sidebar.tsx — reuse it instead of building
@@ -62,8 +67,8 @@ The workflow console below the canvas
 (@features/workflows/components/console-panel.tsx) lists each run's steps and lets
 you select one.
 
-Add an output view showing the selected step's result: its output, its error if
-it failed, or a short note when there's nothing.
+Add an output view showing the selected step's result: its output as formatted
+JSON, its error if it failed, or a short note when there's nothing.
 
 Build it as an InspectorPanel in the workflows feature's components folder,
 rendered inside the ConsolePanel next to the logs and only while a step is
