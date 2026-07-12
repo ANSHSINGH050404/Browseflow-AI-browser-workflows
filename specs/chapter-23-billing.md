@@ -16,6 +16,9 @@ foundation first, then each gate is a sentence.
 Using the clerk-billing skill, turn on Clerk billing for this app. It's
 organization-based, so enable it for organizations and add a "pro" plan that orgs can
 subscribe to.
+
+This is configuration only — enable billing and create the plan, nothing else. Don't
+write any app code or build a pricing or billing screen yet; we'll do that next.
 ```
 
 _On a dev instance, Clerk provides a shared payment gateway, so you can test the whole checkout
