@@ -1,13 +1,13 @@
-import { useCallback } from "react"
-import { useAuth } from "@clerk/nextjs"
+"use client"
+
+import { useCallback, useEffect, useMemo } from "react"
+import { useAuth, useClerk } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 
-// Slug of the organization "Pro" plan configured in Clerk Billing. Kept here so
-// every gate reads from one place — change it if the plan is renamed.
-const PRO_PLAN = "pro"
-
-// Where the pricing table lives inside the dashboard layout.
-const BILLING_PATH = "/billing"
+import {
+  BILLING_PATH,
+  checkIsPro,
+} from "@/features/workflows/lib/billing"
 
 export type ProPlan = {
   // Whether Clerk has hydrated the session — `isPro` is not meaningful until this
@@ -18,22 +18,57 @@ export type ProPlan = {
   isPro: boolean
   // Send the user to the pricing page to subscribe / upgrade.
   goToUpgrade: () => void
+  // Force-refresh the session JWT so new plan claims show up after checkout.
+  refreshEntitlements: () => Promise<void>
 }
 
 // Tells a component whether the active organization is on Pro, and hands it a
 // callback to route the user to the pricing page to upgrade. Use to gate UI
 // behind the Pro plan (e.g. show an "Upgrade" prompt instead of a pro-only node).
 export function useProPlan(): ProPlan {
-  const { has, isLoaded } = useAuth()
+  const { has, isLoaded, orgId } = useAuth()
+  const { session } = useClerk()
   const router = useRouter()
+
+  // After returning from checkout, the JWT can lag the subscription. Reload once
+  // when we have an org and still look free — cheap and fixes the most common
+  // "I paid but still locked" report.
+  useEffect(() => {
+    if (!isLoaded || !orgId || !session) return
+    if (checkIsPro(has)) return
+
+    let cancelled = false
+    void (async () => {
+      try {
+        await session.reload()
+      } catch {
+        // ignore — user may not have just subscribed
+      }
+      if (!cancelled) {
+        // no-op: useAuth will re-render with new claims after reload
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // Only re-run when org/session identity changes, not on every has() flip.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [isLoaded, orgId, session?.id])
 
   const goToUpgrade = useCallback(() => {
     router.push(BILLING_PATH)
   }, [router])
 
-  // `has` is undefined until the session loads; optional-chain and default to
-  // false so callers never treat "unknown" as "subscribed".
-  const isPro = has?.({ plan: PRO_PLAN }) ?? false
+  const refreshEntitlements = useCallback(async () => {
+    await session?.reload()
+  }, [session])
 
-  return { isLoaded, isPro, goToUpgrade }
+  const isPro = useMemo(() => {
+    // Without an active org, org-plan checks always fail in this B2B app.
+    if (!orgId) return false
+    return checkIsPro(has)
+  }, [has, orgId])
+
+  return { isLoaded, isPro, goToUpgrade, refreshEntitlements }
 }

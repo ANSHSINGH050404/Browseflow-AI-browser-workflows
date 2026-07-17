@@ -86,6 +86,17 @@ export default function HelpPage() {
             <strong>Save graph</strong> from the ⋯ menu so scheduled workflows
             keep the latest snapshot.
           </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <strong>Local dev:</strong> you must run{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              npm run trigger:dev
+            </code>{" "}
+            in a second terminal. If you only run Next.js, runs stay{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">QUEUED</code>{" "}
+            then become{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">EXPIRED</code>
+            .
+          </p>
         </section>
 
         <section className="space-y-2">

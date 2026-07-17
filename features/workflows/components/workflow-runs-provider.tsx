@@ -59,9 +59,44 @@ function useWorkflowRuns() {
   return ctx
 }
 
-// A run is still producing steps while it's queued or executing.
+// Active Trigger.dev statuses — include intermediate states so the UI does not
+// treat DEQUEUED/WAITING as "stopped" while the worker is still handling the run.
+const LIVE_STATUSES = new Set([
+  "PENDING_VERSION",
+  "QUEUED",
+  "DEQUEUED",
+  "EXECUTING",
+  "WAITING",
+  "DELAYED",
+])
+
 function isRunLive(run: WorkflowRun): boolean {
-  return run.status === "QUEUED" || run.status === "EXECUTING"
+  return LIVE_STATUSES.has(run.status)
+}
+
+/** Human-readable failure reason for the console (expired = no worker, etc.). */
+export function runFailureMessage(run: {
+  status: WorkflowRun["status"]
+  error?: { message?: string } | null
+}): string | undefined {
+  if (run.status === "EXPIRED") {
+    return "Run expired while queued. Start the Trigger.dev worker (npm run trigger:dev) and try again."
+  }
+  if (run.status === "CANCELED") {
+    return "Run was canceled."
+  }
+  if (
+    run.status === "FAILED" ||
+    run.status === "CRASHED" ||
+    run.status === "SYSTEM_FAILURE" ||
+    run.status === "TIMED_OUT"
+  ) {
+    return (
+      run.error?.message ??
+      `Run ${run.status.toLowerCase().replaceAll("_", " ")}.`
+    )
+  }
+  return undefined
 }
 
 // The steps of a run, wherever they live. Prefer the run's final output steps
@@ -120,6 +155,8 @@ export interface ConsoleRun {
   steps: RunStep[]
   // The Browserbase session id to replay, present only once the run has finished.
   browserbaseSessionId?: string
+  /** Present when the run ended without success (expired, failed, canceled…). */
+  failureMessage?: string
 }
 
 // Every run, newest first, with its steps resolved — the full history a console
@@ -138,6 +175,7 @@ export function useConsoleRuns(): ConsoleRun[] {
           isLive: isRunLive(run),
           steps: stepsForRun(run),
           browserbaseSessionId: sessionIdForRun(run),
+          failureMessage: runFailureMessage(run),
         })),
     [runs]
   )

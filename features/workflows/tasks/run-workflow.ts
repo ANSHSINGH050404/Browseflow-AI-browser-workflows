@@ -34,9 +34,25 @@ export type RunStep = {
 // sessions) gets layered on from here.
 export const runWorkflowTask = task({
   id: "run-workflow",
+  // Keep queued runs available longer while the local worker restarts.
+  // Without a running worker, runs still expire eventually (by design).
+  maxDuration: 3600,
+  retry: {
+    maxAttempts: 2,
+  },
   run: async ({ workflowId, orgId }: { workflowId: string; orgId: string }) => {
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        "DATABASE_URL is missing in the Trigger.dev worker. Ensure .env is loaded when running npm run trigger:dev."
+      )
+    }
+
     const workflow = await getWorkflow(orgId, workflowId)
-    if (!workflow?.graph) throw new Error(`Workflow ${workflowId} has no graph`)
+    if (!workflow?.graph) {
+      throw new Error(
+        `Workflow ${workflowId} has no saved graph. Click Run again after connecting nodes (Run saves the graph).`
+      )
+    }
 
     const { nodes, edges } = workflow.graph
     const byId = new Map(nodes.map((n) => [n.id, n]))
@@ -86,16 +102,33 @@ export const runWorkflowTask = task({
     let browserbaseSessionId: string | undefined
     const getStagehand = async () => {
       if (stagehand) return stagehand
-      stagehand = new Stagehand({
-        env: "BROWSERBASE",
-        apiKey: process.env.BROWSERBASE_API_KEY!,
-        model: "google/gemini-2.5-flash",
-        // Pino's logging backend spawns a thread-stream worker (lib/worker.js)
-        // that can't be resolved inside trigger.dev's bundled output. Disable it —
-        // the option exists for exactly these minimal/bundled environments.
-        disablePino: true,
-      })
-      await stagehand.init()
+      const apiKey = process.env.BROWSERBASE_API_KEY
+      if (!apiKey) {
+        throw new Error(
+          "BROWSERBASE_API_KEY is missing in the Trigger.dev worker environment."
+        )
+      }
+      try {
+        stagehand = new Stagehand({
+          env: "BROWSERBASE",
+          apiKey,
+          // Optional — set BROWSERBASE_PROJECT_ID if your account has multiple projects.
+          ...(process.env.BROWSERBASE_PROJECT_ID
+            ? { projectId: process.env.BROWSERBASE_PROJECT_ID }
+            : {}),
+          model: "google/gemini-2.5-flash",
+          // Pino's logging backend spawns a thread-stream worker (lib/worker.js)
+          // that can't be resolved inside trigger.dev's bundled output. Disable it —
+          // the option exists for exactly these minimal/bundled environments.
+          disablePino: true,
+        })
+        await stagehand.init()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        throw new Error(
+          `Failed to start Browserbase session: ${message}. Check BROWSERBASE_API_KEY (and BROWSERBASE_PROJECT_ID if required).`
+        )
+      }
       browserbaseSessionId = stagehand.browserbaseSessionID
       return stagehand
     }

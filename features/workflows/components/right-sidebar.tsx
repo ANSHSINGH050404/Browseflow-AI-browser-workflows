@@ -39,11 +39,11 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   cancelWorkflowRunAction,
   cloneWorkflowAction,
-  deleteWorkflowAction,
   renameWorkflowAction,
   runWorkflowAction,
   saveWorkflowAction,
 } from "@/features/workflows/actions"
+import { DeleteWorkflowDialog } from "@/features/workflows/components/delete-workflow-dialog"
 import {
   buildExport,
   downloadExport,
@@ -254,6 +254,9 @@ function Palette() {
   const add = (type: NodeType) => {
     // Premium nodes route to upgrade instead of being added for non-pro orgs.
     if (isLocked(type)) {
+      toast.error(
+        "Agent requires an Organization Pro plan. Open Billing and refresh plan status after checkout."
+      )
       goToUpgrade()
       return
     }
@@ -348,129 +351,133 @@ function ActionsMenu({
   workflowName: string
 }) {
   const [isPending, startTransition] = useTransition()
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const { getNodes, getEdges } = useReactFlow<StepNodeType>()
   const router = useRouter()
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost">
-          <MoreHorizontal />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-48">
-        <DropdownMenuItem
-          disabled={isPending}
-          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
-          onSelect={(e) => {
-            e.preventDefault()
-            const next = window.prompt("Rename workflow", workflowName)
-            if (next == null || next.trim() === workflowName) return
-            startTransition(async () => {
-              try {
-                await renameWorkflowAction(workflowId, next)
-                toast.success("Workflow renamed")
-                router.refresh()
-              } catch (err) {
-                toast.error(
-                  err instanceof Error ? err.message : "Couldn't rename"
-                )
-              }
-            })
-          }}
-        >
-          <Pencil />
-          Rename
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled={isPending}
-          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
-          onSelect={(e) => {
-            e.preventDefault()
-            const graph = { nodes: getNodes(), edges: getEdges() }
-            const problems = validateGraph(graph)
-            if (problems.length > 0) {
-              toast.error(problems[0])
-              return
-            }
-            startTransition(async () => {
-              try {
-                await saveWorkflowAction({ id: workflowId, graph })
-                toast.success(
-                  "Saved. Scheduled triggers use this snapshot on the next tick."
-                )
-              } catch (err) {
-                toast.error(
-                  err instanceof Error ? err.message : "Couldn't save"
-                )
-              }
-            })
-          }}
-        >
-          <Save />
-          Save graph
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled={isPending}
-          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
-          onSelect={(e) => {
-            e.preventDefault()
-            const graph = { nodes: getNodes(), edges: getEdges() }
-            startTransition(async () => {
-              try {
-                // Persist latest canvas so scheduled runs match, then clone.
-                const problems = validateGraph(graph)
-                if (problems.length === 0) {
-                  await saveWorkflowAction({ id: workflowId, graph })
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="icon" variant="ghost">
+            <MoreHorizontal />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-48">
+          <DropdownMenuItem
+            disabled={isPending}
+            className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+            onSelect={(e) => {
+              e.preventDefault()
+              const next = window.prompt("Rename workflow", workflowName)
+              if (next == null || next.trim() === workflowName) return
+              startTransition(async () => {
+                try {
+                  await renameWorkflowAction(workflowId, next)
+                  toast.success("Workflow renamed")
+                  router.refresh()
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error ? err.message : "Couldn't rename"
+                  )
                 }
-                await cloneWorkflowAction(workflowId, graph)
-              } catch (err) {
-                toast.error(
-                  err instanceof Error ? err.message : "Couldn't clone"
-                )
-              }
-            })
-          }}
-        >
-          <Copy />
-          Duplicate
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
-          onSelect={(e) => {
-            e.preventDefault()
-            try {
+              })
+            }}
+          >
+            <Pencil />
+            Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={isPending}
+            className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+            onSelect={(e) => {
+              e.preventDefault()
               const graph = { nodes: getNodes(), edges: getEdges() }
-              downloadExport(buildExport(workflowName, graph))
-              toast.success("Exported workflow JSON")
-            } catch {
-              toast.error("Couldn't export workflow")
-            }
-          }}
-        >
-          <Download />
-          Export JSON
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          disabled={isPending}
-          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
-          onSelect={(e) => {
-            // Keep the menu mounted while the delete runs so the disabled state
-            // stays visible. Running inside a transition lets the router handle
-            // the action's redirect home on success.
-            e.preventDefault()
-            startTransition(async () => {
-              await deleteWorkflowAction(workflowId)
-            })
-          }}
-        >
-          <Trash2 />
-          Delete workflow
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+              const problems = validateGraph(graph)
+              if (problems.length > 0) {
+                toast.error(problems[0])
+                return
+              }
+              startTransition(async () => {
+                try {
+                  await saveWorkflowAction({ id: workflowId, graph })
+                  toast.success(
+                    "Saved. Scheduled triggers use this snapshot on the next tick."
+                  )
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error ? err.message : "Couldn't save"
+                  )
+                }
+              })
+            }}
+          >
+            <Save />
+            Save graph
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={isPending}
+            className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+            onSelect={(e) => {
+              e.preventDefault()
+              const graph = { nodes: getNodes(), edges: getEdges() }
+              startTransition(async () => {
+                try {
+                  // Persist latest canvas so scheduled runs match, then clone.
+                  const problems = validateGraph(graph)
+                  if (problems.length === 0) {
+                    await saveWorkflowAction({ id: workflowId, graph })
+                  }
+                  await cloneWorkflowAction(workflowId, graph)
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error ? err.message : "Couldn't clone"
+                  )
+                }
+              })
+            }}
+          >
+            <Copy />
+            Duplicate
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+            onSelect={(e) => {
+              e.preventDefault()
+              try {
+                const graph = { nodes: getNodes(), edges: getEdges() }
+                downloadExport(buildExport(workflowName, graph))
+                toast.success("Exported workflow JSON")
+              } catch {
+                toast.error("Couldn't export workflow")
+              }
+            }}
+          >
+            <Download />
+            Export JSON
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={isPending}
+            className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+            onSelect={(e) => {
+              e.preventDefault()
+              setDeleteOpen(true)
+            }}
+          >
+            <Trash2 />
+            Delete workflow
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DeleteWorkflowDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        workflowId={workflowId}
+        workflowName={workflowName}
+      />
+    </>
   )
 }
 
@@ -522,7 +529,9 @@ function RunButton({ workflowId }: { workflowId: string }) {
         startTransition(async () => {
           try {
             await runWorkflowAction({ id: workflowId, graph })
-            toast.success("Run started")
+            toast.success(
+              "Run queued — keep npm run trigger:dev running to execute it"
+            )
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Run failed")
           }

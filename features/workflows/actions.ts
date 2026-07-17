@@ -21,6 +21,7 @@ import {
   parseWorkflowImport,
   remapGraphIds,
 } from "@/features/workflows/lib/export-format"
+import { checkIsPro } from "@/features/workflows/lib/billing"
 import {
   FREE_MONTHLY_RUN_LIMIT,
   FREE_WORKFLOW_LIMIT,
@@ -66,7 +67,7 @@ export async function createWorkflowAction(name?: string) {
     throw new Error("No active organization")
   }
 
-  const isPro = has({ plan: "pro" })
+  const isPro = checkIsPro(has)
   await assertCanCreateWorkflow(orgId, isPro)
 
   Sentry.getIsolationScope().setAttributes({
@@ -94,7 +95,7 @@ export async function createWorkflowFromTemplateAction(templateId: string) {
     throw new Error("Unknown template")
   }
 
-  const isPro = has({ plan: "pro" })
+  const isPro = checkIsPro(has)
   await assertCanCreateWorkflow(orgId, isPro)
 
   Sentry.getIsolationScope().setAttributes({
@@ -122,7 +123,7 @@ export async function cloneWorkflowAction(
   const { orgId, has } = await auth()
   if (!orgId) throw new Error("No active organization")
 
-  const isPro = has({ plan: "pro" })
+  const isPro = checkIsPro(has)
   await assertCanCreateWorkflow(orgId, isPro)
 
   const source = await getWorkflow(orgId, id)
@@ -154,7 +155,7 @@ export async function importWorkflowAction(jsonText: string) {
   const { orgId, has } = await auth()
   if (!orgId) throw new Error("No active organization")
 
-  const isPro = has({ plan: "pro" })
+  const isPro = checkIsPro(has)
   await assertCanCreateWorkflow(orgId, isPro)
 
   let raw: unknown
@@ -217,7 +218,16 @@ export async function deleteWorkflowAction(id: string) {
   }
 
   // The workflow id doubles as its Liveblocks room id — clean it up too.
-  await liveblocks.deleteRoom(id)
+  try {
+    await liveblocks.deleteRoom(id)
+  } catch (error) {
+    // Room may not exist if the canvas was never opened; still treat delete as OK.
+    Sentry.logger.warn("Liveblocks room delete skipped", {
+      workflowId: id,
+      orgId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
 
   Sentry.logger.info("Workflow deleted", { workflowId: id, orgId })
 
@@ -238,7 +248,7 @@ export async function runWorkflowAction({
     throw new Error("No active organization")
   }
 
-  const isPro = has({ plan: "pro" })
+  const isPro = checkIsPro(has)
 
   // The Agent node is Pro-only. Enforce it here rather than in the run task: the
   // action holds the Clerk session (and has()), while the Trigger.dev task runs
@@ -272,10 +282,15 @@ export async function runWorkflowAction({
     throw error
   }
 
+  // Longer TTL than the default 10m so a briefly stopped worker does not expire
+  // the run before you can restart `npm run trigger:dev`.
   const handle = await tasks.trigger<typeof runWorkflowTask>(
     "run-workflow",
     { workflowId: id, orgId },
-    { tags: [`workflow:${id}`, orgRunTag(orgId)] }
+    {
+      tags: [`workflow:${id}`, orgRunTag(orgId)],
+      ttl: "30m",
+    }
   )
 
   Sentry.logger.info("Workflow run triggered", {

@@ -3,7 +3,9 @@ import { esbuildPlugin } from "@trigger.dev/build/extensions";
 import sentryEsbuildPlugin from "@sentry/esbuild-plugin";
 
 export default defineConfig({
-  project: "proj_ntfnxpyhigpgyqvfkoso",
+  // Must match the project externalRef for the TRIGGER_SECRET_KEY in .env
+  // (cloud.trigger.dev → Project → Settings → Project ref).
+  project: "proj_heljclrhstczrzskkfnh",
   runtime: "node",
   logLevel: "log",
   // The max compute seconds a task is allowed to run. If the task run exceeds this duration, it will be stopped.

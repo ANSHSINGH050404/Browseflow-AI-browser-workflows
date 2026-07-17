@@ -140,8 +140,28 @@ export function LogsPanel({
         <div key={run.id} className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground">
             <span>{run.createdAt.toLocaleTimeString()}</span>
-            <span className="lowercase">{run.status}</span>
+            <span
+              className={cn(
+                "lowercase",
+                run.failureMessage && "text-destructive",
+                run.isLive && "text-blue-600 dark:text-blue-400"
+              )}
+            >
+              {run.status}
+            </span>
           </div>
+          {run.failureMessage && (
+            <p className="px-2 pb-1 text-[11px] leading-snug text-destructive">
+              {run.failureMessage}
+            </p>
+          )}
+          {run.isLive && run.status === "QUEUED" && (
+            <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
+              Waiting for a worker. In local dev, run{" "}
+              <code className="rounded bg-muted px-1">npm run trigger:dev</code>{" "}
+              in another terminal.
+            </p>
+          )}
           {run.steps.map((step) => (
             <StepRow
               key={step.nodeId}

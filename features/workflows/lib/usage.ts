@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server"
 import { runs } from "@trigger.dev/sdk"
 
 import { countWorkflows } from "@/features/workflows/data"
+import { checkIsPro } from "@/features/workflows/lib/billing"
 import {
   buildUsageSummary,
   type UsageSummary,
@@ -38,7 +39,7 @@ export async function getUsageSummaryForActiveOrg(): Promise<UsageSummary | null
   const { orgId, has } = await auth()
   if (!orgId) return null
 
-  const isPro = has({ plan: "pro" })
+  const isPro = checkIsPro(has)
   const workflowsUsed = await countWorkflows(orgId)
   const runsUsedThisMonth = isPro ? null : await countOrgRunsThisMonth(orgId)
 

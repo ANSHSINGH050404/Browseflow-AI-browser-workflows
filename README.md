@@ -24,11 +24,17 @@ npm install
 npm run dev
 ```
 
-Also run the Trigger.dev worker for background runs and schedules:
+**Required for automation:** runs are processed by a Trigger.dev worker. Without it, jobs sit in `QUEUED` and then **EXPIRED** (this looks like “queued then stopped”).
+
+In a **second** terminal:
 
 ```bash
-npx trigger.dev@latest dev
+npm run trigger:dev
 ```
+
+Leave both processes running. Then click **Run** in the app.
+
+If a run already expired, start the worker and click **Run** again.
 
 ### Environment
 
