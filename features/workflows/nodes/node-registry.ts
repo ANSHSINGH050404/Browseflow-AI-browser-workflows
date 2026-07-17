@@ -1,12 +1,16 @@
 import type { Node } from "@xyflow/react"
 import {
   Bot,
+  Clock,
   Eye,
+  GitBranch,
   Globe,
   Mail,
   MousePointerClick,
   Pointer,
   ScanText,
+  Timer,
+  Webhook,
   type LucideIcon,
 } from "lucide-react"
 
@@ -47,6 +51,25 @@ export const nodeRegistry = {
     accent: "bg-blue-500 text-white",
     fields: [],
     outputs: [],
+  },
+  schedule: {
+    type: "schedule",
+    kind: "trigger",
+    label: "Schedule",
+    icon: Clock,
+    accent: "bg-indigo-500 text-white",
+    fields: [
+      {
+        key: "interval",
+        label: "Interval",
+        placeholder: "hourly or daily",
+        required: true,
+      },
+    ],
+    outputs: [
+      { path: "interval", label: "Interval" },
+      { path: "triggeredAt", label: "Triggered at" },
+    ],
   },
   "open-url": {
     type: "open-url",
@@ -160,6 +183,94 @@ export const nodeRegistry = {
       },
     ],
     outputs: [{ path: "id", label: "Email ID" }],
+  },
+  http: {
+    type: "http",
+    kind: "action",
+    label: "HTTP Request",
+    icon: Webhook,
+    accent: "bg-cyan-500 text-white",
+    fields: [
+      {
+        key: "method",
+        label: "Method",
+        placeholder: "GET",
+        required: true,
+      },
+      {
+        key: "url",
+        label: "URL",
+        placeholder: "https://api.example.com/data",
+        required: true,
+      },
+      {
+        key: "headers",
+        label: "Headers (JSON)",
+        placeholder: '{"Authorization":"Bearer …"}',
+        multiline: true,
+      },
+      {
+        key: "body",
+        label: "Body",
+        placeholder: '{"key":"value"}',
+        multiline: true,
+      },
+    ],
+    outputs: [
+      { path: "status", label: "Status" },
+      { path: "ok", label: "OK" },
+      { path: "body", label: "Body" },
+      { path: "json", label: "JSON" },
+      { path: "url", label: "URL" },
+    ],
+  },
+  wait: {
+    type: "wait",
+    kind: "action",
+    label: "Wait",
+    icon: Timer,
+    accent: "bg-slate-500 text-white",
+    fields: [
+      {
+        key: "seconds",
+        label: "Seconds",
+        placeholder: "5",
+        required: true,
+      },
+    ],
+    outputs: [{ path: "waitedSeconds", label: "Waited seconds" }],
+  },
+  condition: {
+    type: "condition",
+    kind: "action",
+    label: "Condition",
+    icon: GitBranch,
+    accent: "bg-orange-500 text-white",
+    fields: [
+      {
+        key: "left",
+        label: "Left value",
+        placeholder: "{{some-node.field}}",
+        required: true,
+      },
+      {
+        key: "operator",
+        label: "Operator",
+        placeholder: "equals | contains | is_truthy …",
+        required: true,
+      },
+      {
+        key: "right",
+        label: "Right value",
+        placeholder: "expected value",
+      },
+    ],
+    outputs: [
+      { path: "passed", label: "Passed" },
+      { path: "left", label: "Left" },
+      { path: "operator", label: "Operator" },
+      { path: "right", label: "Right" },
+    ],
   },
 } satisfies Record<string, NodeDefinition>
 

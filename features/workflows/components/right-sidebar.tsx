@@ -1,8 +1,19 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { useReactFlow, useStore } from "@xyflow/react"
-import { Lock, MoreHorizontal, Play, Square, Trash2 } from "lucide-react"
+import {
+  Copy,
+  Download,
+  Lock,
+  MoreHorizontal,
+  Pencil,
+  Play,
+  Save,
+  Square,
+  Trash2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -16,6 +27,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -26,9 +38,16 @@ import { Textarea } from "@/components/ui/textarea"
 
 import {
   cancelWorkflowRunAction,
+  cloneWorkflowAction,
   deleteWorkflowAction,
+  renameWorkflowAction,
   runWorkflowAction,
+  saveWorkflowAction,
 } from "@/features/workflows/actions"
+import {
+  buildExport,
+  downloadExport,
+} from "@/features/workflows/lib/export-format"
 import { NodeIcon } from "@/features/workflows/components/node-icon"
 import { useLiveRun } from "@/features/workflows/components/workflow-runs-provider"
 import { useProPlan } from "@/features/workflows/hooks/use-pro-plan"
@@ -321,8 +340,16 @@ function Palette() {
 // ---------------------------------------------------------------------------
 
 // The "..." menu for workflow-level actions.
-function ActionsMenu({ workflowId }: { workflowId: string }) {
+function ActionsMenu({
+  workflowId,
+  workflowName,
+}: {
+  workflowId: string
+  workflowName: string
+}) {
   const [isPending, startTransition] = useTransition()
+  const { getNodes, getEdges } = useReactFlow<StepNodeType>()
+  const router = useRouter()
 
   return (
     <DropdownMenu>
@@ -332,6 +359,99 @@ function ActionsMenu({ workflowId }: { workflowId: string }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-48">
+        <DropdownMenuItem
+          disabled={isPending}
+          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+          onSelect={(e) => {
+            e.preventDefault()
+            const next = window.prompt("Rename workflow", workflowName)
+            if (next == null || next.trim() === workflowName) return
+            startTransition(async () => {
+              try {
+                await renameWorkflowAction(workflowId, next)
+                toast.success("Workflow renamed")
+                router.refresh()
+              } catch (err) {
+                toast.error(
+                  err instanceof Error ? err.message : "Couldn't rename"
+                )
+              }
+            })
+          }}
+        >
+          <Pencil />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={isPending}
+          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+          onSelect={(e) => {
+            e.preventDefault()
+            const graph = { nodes: getNodes(), edges: getEdges() }
+            const problems = validateGraph(graph)
+            if (problems.length > 0) {
+              toast.error(problems[0])
+              return
+            }
+            startTransition(async () => {
+              try {
+                await saveWorkflowAction({ id: workflowId, graph })
+                toast.success(
+                  "Saved. Scheduled triggers use this snapshot on the next tick."
+                )
+              } catch (err) {
+                toast.error(
+                  err instanceof Error ? err.message : "Couldn't save"
+                )
+              }
+            })
+          }}
+        >
+          <Save />
+          Save graph
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={isPending}
+          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+          onSelect={(e) => {
+            e.preventDefault()
+            const graph = { nodes: getNodes(), edges: getEdges() }
+            startTransition(async () => {
+              try {
+                // Persist latest canvas so scheduled runs match, then clone.
+                const problems = validateGraph(graph)
+                if (problems.length === 0) {
+                  await saveWorkflowAction({ id: workflowId, graph })
+                }
+                await cloneWorkflowAction(workflowId, graph)
+              } catch (err) {
+                toast.error(
+                  err instanceof Error ? err.message : "Couldn't clone"
+                )
+              }
+            })
+          }}
+        >
+          <Copy />
+          Duplicate
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+          onSelect={(e) => {
+            e.preventDefault()
+            try {
+              const graph = { nodes: getNodes(), edges: getEdges() }
+              downloadExport(buildExport(workflowName, graph))
+              toast.success("Exported workflow JSON")
+            } catch {
+              toast.error("Couldn't export workflow")
+            }
+          }}
+        >
+          <Download />
+          Export JSON
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
           disabled={isPending}
@@ -400,7 +520,12 @@ function RunButton({ workflowId }: { workflowId: string }) {
         }
 
         startTransition(async () => {
-          await runWorkflowAction({ id: workflowId, graph })
+          try {
+            await runWorkflowAction({ id: workflowId, graph })
+            toast.success("Run started")
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Run failed")
+          }
         })
       }}
     >
@@ -414,13 +539,20 @@ function RunButton({ workflowId }: { workflowId: string }) {
 // The sidebar itself — header on top, then the Toolbar / Editor tabs.
 // ---------------------------------------------------------------------------
 
-export function RightSidebar({ workflowId }: { workflowId: string }) {
+export function RightSidebar({
+  workflowId,
+  workflowName,
+}: {
+  workflowId: string
+  workflowName: string
+}) {
   const [tab, setTab] = useState("toolbar")
 
-  // TODO: read the currently selected node from React Flow.
-  const selected = useStore((s) => s.nodes.find((n) => n.selected)) as StepNodeType | undefined
+  const selected = useStore((s) =>
+    s.nodes.find((n) => n.selected)
+  ) as StepNodeType | undefined
 
-  // TODO: auto-switch to the Editor tab when the selection changes.
+  // Auto-switch to the Editor tab when the selection changes.
   const [prevSelectedId, setPrevSelectedId] = useState(selected?.id)
   if (selected && selected.id !== prevSelectedId) {
     setPrevSelectedId(selected.id)
@@ -436,9 +568,17 @@ export function RightSidebar({ workflowId }: { workflowId: string }) {
       groupResizeBehavior="preserve-pixel-size"
     >
       <Tabs value={tab} onValueChange={setTab} className="size-full gap-0">
-        <div className="flex items-center justify-between border-b border-border p-2">
-          <ActionsMenu workflowId={workflowId} />
-          <RunButton workflowId={workflowId} />
+        <div className="flex flex-col gap-1 border-b border-border p-2">
+          <div className="flex items-center justify-between gap-2">
+            <ActionsMenu workflowId={workflowId} workflowName={workflowName} />
+            <RunButton workflowId={workflowId} />
+          </div>
+          <p
+            className="truncate px-1 text-xs font-medium text-muted-foreground"
+            title={workflowName}
+          >
+            {workflowName}
+          </p>
         </div>
         <TabsList className="m-2 w-fit bg-background">
           <TabsTrigger

@@ -1,6 +1,6 @@
 {
-  "name": "browser-automation",
-  "version": "0.0.1",
+  "name": "browseflow",
+  "version": "0.1.0",
   "type": "module",
   "private": true,
   "scripts": {

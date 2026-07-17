@@ -4,8 +4,13 @@ import { useTransition } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { PlusIcon, WorkflowIcon } from "lucide-react"
+import { toast } from "sonner"
 
 import { generateSlug } from "@/features/workflows/lib/generate-slug"
+import {
+  FREE_WORKFLOW_LIMIT,
+  workflowLimitMessage,
+} from "@/features/workflows/lib/limits"
 import {
   Popover,
   PopoverContent,
@@ -23,6 +28,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import type { Workflow } from "@/lib/db/schema"
+import { useProPlan } from "@/features/workflows/hooks/use-pro-plan"
 
 interface WorkflowNavProps {
   workflows: Workflow[]
@@ -33,10 +39,25 @@ export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
   const { state } = useSidebar()
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
+  const { isLoaded, isPro, goToUpgrade } = useProPlan()
+
+  const atFreeLimit =
+    isLoaded && !isPro && workflows.length >= FREE_WORKFLOW_LIMIT
 
   const handleCreateWorkflow = () => {
+    if (atFreeLimit) {
+      toast.error(workflowLimitMessage())
+      goToUpgrade()
+      return
+    }
     startTransition(async () => {
-      await onCreateWorkflow(generateSlug())
+      try {
+        await onCreateWorkflow(generateSlug())
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Couldn't create workflow"
+        )
+      }
     })
   }
 
@@ -52,6 +73,10 @@ export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
       </SidebarMenuButton>
     </SidebarMenuItem>
   ))
+
+  const createTitle = atFreeLimit
+    ? workflowLimitMessage()
+    : "New workflow"
 
   if (state === "collapsed") {
     return (
@@ -72,6 +97,7 @@ export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
                       <SidebarMenuButton
                         onClick={handleCreateWorkflow}
                         disabled={isPending}
+                        title={createTitle}
                       >
                         <PlusIcon />
                         <span>New workflow</span>
@@ -91,9 +117,16 @@ export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Workflows</SidebarGroupLabel>
+      <SidebarGroupLabel className="flex items-center justify-between gap-2 pr-1">
+        <span>Workflows</span>
+        {isLoaded && !isPro && (
+          <span className="text-[10px] font-normal text-muted-foreground">
+            {workflows.length}/{FREE_WORKFLOW_LIMIT} free
+          </span>
+        )}
+      </SidebarGroupLabel>
       <SidebarGroupAction
-        title="New workflow"
+        title={createTitle}
         onClick={handleCreateWorkflow}
         disabled={isPending}
       >

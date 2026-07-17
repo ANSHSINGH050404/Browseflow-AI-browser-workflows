@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, count, desc, eq } from "drizzle-orm"
 
 import { db } from "@/lib/db"
 import { WorkflowGraph, workflows } from "@/lib/db/schema"
@@ -29,6 +29,14 @@ export function listWorkflows(orgId: string) {
     .orderBy(desc(workflows.createdAt))
 }
 
+export async function countWorkflows(orgId: string) {
+  const [row] = await db
+    .select({ value: count() })
+    .from(workflows)
+    .where(eq(workflows.orgId, orgId))
+  return row?.value ?? 0
+}
+
 export async function getWorkflow(orgId: string, id: string) {
   const [workflow] = await db
     .select()
@@ -38,10 +46,27 @@ export async function getWorkflow(orgId: string, id: string) {
   return workflow
 }
 
-export async function createWorkflow(orgId: string, name: string) {
+export async function createWorkflow(
+  orgId: string,
+  name: string,
+  graph?: WorkflowGraph | null
+) {
   const [workflow] = await db
     .insert(workflows)
-    .values({ orgId, name })
+    .values({ orgId, name, graph: graph ?? null })
+    .returning()
+
+  return workflow
+}
+
+export async function renameWorkflow(orgId: string, id: string, name: string) {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error("Workflow name cannot be empty")
+
+  const [workflow] = await db
+    .update(workflows)
+    .set({ name: trimmed, updatedAt: new Date() })
+    .where(and(eq(workflows.id, id), eq(workflows.orgId, orgId)))
     .returning()
 
   return workflow
@@ -54,4 +79,9 @@ export async function deleteWorkflow(orgId: string, id: string) {
     .returning()
 
   return workflow
+}
+
+/** All workflows that have a persisted graph (used by the schedule runner). */
+export async function listWorkflowsWithGraphs() {
+  return db.select().from(workflows)
 }

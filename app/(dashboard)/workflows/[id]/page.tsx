@@ -51,7 +51,11 @@ export default async function Page({
     <Room roomId={id}>
       <ReactFlowProvider>
         <WorkflowRunsProvider workflowId={id} accessToken={runsToken}>
-          <WorkflowShell workflowId={id} />
+          <WorkflowShell
+            workflowId={id}
+            workflowName={workflow.name}
+            initialGraph={workflow.graph}
+          />
         </WorkflowRunsProvider>
       </ReactFlowProvider>
     </Room>

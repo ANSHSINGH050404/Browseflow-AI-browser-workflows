@@ -2,7 +2,7 @@ import toposort from "toposort"
 import { logger, metadata, task } from "@trigger.dev/sdk"
 import type { DeserializedJson } from "@trigger.dev/core"
 import { Stagehand } from "@browserbasehq/stagehand"
-import { nodeExecutors } from "@/features/workflows/nodes/node-executors"
+import { getExecutor } from "@/features/workflows/nodes/node-executors"
 import {
   interpolate,
   type NodeOutputs,
@@ -114,7 +114,7 @@ export const runWorkflowTask = task({
       // A node with no executor (the start trigger) does no work and produces no
       // output — mark it done rather than leaving it "pending", which reads as
       // skipped forever in the console.
-      const executor = nodeExecutors[node.data.type]
+      const executor = getExecutor(node.data.type)
       if (!executor) {
         step.status = "done"
         publishSteps()
