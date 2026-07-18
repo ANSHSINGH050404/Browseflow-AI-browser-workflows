@@ -31,7 +31,7 @@ jobs:
 
       - name: Deploy tasks
         env:
-          # Personal Access Token from Trigger.dev (Account → Access Tokens).
-          # Repo secret: TRIGGER_ACCESS_TOKEN
-          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+          # Prefer TRIGGER_ACCESS_TOKEN (Trigger.dev → Account → Access Tokens).
+          # Falls back to TRIGGER_SECRET_KEY if you only set that secret.
+          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN || secrets.TRIGGER_SECRET_KEY }}
         run: npx trigger.dev@4.5.3 deploy --env prod
