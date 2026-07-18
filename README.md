@@ -4,6 +4,10 @@
 
 Browseflow is a visual builder for AI browser automation. Compose Open URL, Act, Extract, Observe, Agent, HTTP, Wait, Condition, and email steps on a canvas — then run them with live status and session replay.
 
+## Live demo
+
+**Production:** [https://browseflow-wine.vercel.app](https://browseflow-wine.vercel.app)
+
 ## Features
 
 - **Visual workflows** with React Flow + multiplayer editing (Liveblocks)
