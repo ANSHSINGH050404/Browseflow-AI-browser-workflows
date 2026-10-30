@@ -13,7 +13,9 @@ function StepNodeComponent({ id, data, selected }: NodeProps<StepNodeType>) {
   const { type, kind, title, values } = data
   const def = nodeRegistry[type]
   const Icon = def.icon
-  const fields = def.fields.filter((field) => values[field.key])
+  const fields = def.fields.filter(
+    (field) => values[field.key] != null && values[field.key].trim() !== ""
+  )
 
   // Reflect this node's state in the latest run. A node is only "running" while
   // the run is actually live — once it ends, a node left marked running stops

@@ -15,17 +15,17 @@ export function orgRunTag(orgId: string) {
 /** Best-effort count of run-workflow executions for this org since month start. */
 export async function countOrgRunsThisMonth(orgId: string): Promise<number | null> {
   try {
-    const from = new Date()
-    from.setUTCDate(1)
-    from.setUTCHours(0, 0, 0, 0)
+    const now = new Date()
+    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
 
     let total = 0
     // Cap so a busy org cannot hang the sidebar render.
-    for await (const _run of runs.list({
+    for await (const run of runs.list({
       tag: orgRunTag(orgId),
       from,
       taskIdentifier: "run-workflow",
     })) {
+      void run
       total += 1
       if (total > 200) break
     }

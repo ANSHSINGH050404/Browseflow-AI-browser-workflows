@@ -104,7 +104,7 @@ export function runFailureMessage(run: {
 // task publishes while it runs — a failed or in-flight run only has the latter.
 function stepsForRun(run: WorkflowRun): RunStep[] {
   const metadataSteps = run.metadata?.steps as RunStep[] | undefined
-  return run.output?.steps ?? metadataSteps ?? []
+  return run.output?.steps?.length ? run.output.steps : (metadataSteps ?? [])
 }
 
 interface LatestRunSteps {

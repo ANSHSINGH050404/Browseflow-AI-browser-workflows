@@ -1,8 +1,10 @@
 import * as Sentry from "@sentry/nextjs"
 import { auth } from "@clerk/nextjs/server"
+import { runs } from "@trigger.dev/sdk"
 import { NotFoundError } from "@browserbasehq/sdk"
 
 import { browserbase } from "@/lib/browserbase"
+import { checkIsPro } from "@/features/workflows/lib/billing"
 
 // Proxies a Browserbase session's replay so the browser can play it back. The
 // retrieval needs the secret API key, so it can only happen server-side — the
@@ -33,12 +35,46 @@ export async function GET(
   // Session replay is a Pro feature. Gate it here, not just in the UI, so a
   // non-pro org can't pull a recording by calling the route directly. `has`
   // evaluates the active org, which we've confirmed exists above.
-  if (!has({ plan: "pro" })) {
+  if (!checkIsPro(has)) {
     Sentry.logger.warn("Session replay denied — Pro plan required", {
       orgId,
       sessionId,
     })
     return new Response("Pro plan required", { status: 403 })
+  }
+
+  // Ownership check: only proxy replays for sessions this org actually drove.
+  // Session ids are unguessable but not access-controlled by Browserbase, so we
+  // verify the id appears in one of this org's finished run outputs before
+  // handing out the playlist.
+  let owned = false
+  try {
+    let checked = 0
+    for await (const run of runs.list({
+      tag: `org:${orgId}`,
+      taskIdentifier: "run-workflow",
+    })) {
+      if (checked++ > 200) break
+      try {
+        const full = await runs.retrieve(run.id)
+        if (full.output?.browserbaseSessionId === sessionId) {
+          owned = true
+          break
+        }
+      } catch {
+        // ignore individual run retrieval failures
+      }
+    }
+  } catch {
+    // If run listing fails, fail closed.
+    owned = false
+  }
+  if (!owned) {
+    Sentry.logger.warn("Session replay denied — session not owned by org", {
+      orgId,
+      sessionId,
+    })
+    return new Response("Not found", { status: 404 })
   }
 
   try {

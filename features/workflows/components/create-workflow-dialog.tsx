@@ -33,7 +33,10 @@ export function CreateWorkflowDialog({
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
-    if (open) setName("")
+    if (open) {
+      const id = setTimeout(() => setName(""), 0)
+      return () => clearTimeout(id)
+    }
   }, [open])
 
   const submit = () => {

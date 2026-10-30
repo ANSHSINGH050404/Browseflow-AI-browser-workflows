@@ -329,6 +329,15 @@ export async function cancelWorkflowRunAction(runId: string) {
     runId,
   })
 
+  // Only cancel runs that belong to this org — the run id alone is attacker-controllable.
+  const run = await runs.retrieve(runId)
+  if (
+    run.taskIdentifier !== "run-workflow" ||
+    !run.tags.includes(`org:${orgId}`)
+  ) {
+    throw new Error("Run not found")
+  }
+
   await runs.cancel(runId)
 
   Sentry.logger.info("Workflow run cancelled", { runId, orgId })

@@ -27,7 +27,7 @@ export function TemplateCards({ workflowCount = 0 }: { workflowCount?: number })
   const atFreeLimit =
     isLoaded && !isPro && workflowCount >= FREE_WORKFLOW_LIMIT
 
-  const useTemplate = (templateId: string) => {
+  const handleUseTemplate = (templateId: string) => {
     if (atFreeLimit) {
       toast.error(workflowLimitMessage())
       goToUpgrade()
@@ -60,7 +60,7 @@ export function TemplateCards({ workflowCount = 0 }: { workflowCount?: number })
               size="sm"
               variant="outline"
               disabled={isPending}
-              onClick={() => useTemplate(template.id)}
+              onClick={() => handleUseTemplate(template.id)}
             >
               <LayoutTemplate className="size-3.5" />
               Use template
